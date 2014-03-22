@@ -2,7 +2,6 @@ package multio
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"log"
 )
@@ -39,7 +38,6 @@ func (m *Multiplexer) decodeMsg(src []byte, err error) (*Message, error) {
 	msg := &Message{}
 	msg.decode(src, nil)
 	if msg.err != nil {
-		fmt.Printf("error decode: %s\n", msg.err)
 		return nil, msg.err
 	}
 	return msg, nil
@@ -56,24 +54,20 @@ func (m *Multiplexer) StartRead() error {
 	buf := make([]byte, PageSize+HeaderLen)
 	for {
 		n, err := m.r.Read(buf)
-		fmt.Printf("readed: %d, %v\n", n, buf[:n])
 		msg, err := m.decodeMsg(buf[:n], err)
 		if err != nil {
 			// An error will cause deadlock panic if not properly handled
 			log.Print(err)
 			continue
 		}
-		println("----> message decoded")
 		switch msg.kind {
 		case Frame:
-			println("||| FRAME")
 			// Send the message. Use goroutine to queue the messages.
 			// We do not use buffered chan because they have a fixed size.
 			go func() {
 				m.readChans[int(msg.id)] <- msg
 			}()
 		case Ack:
-			println("||| ACK")
 			m.ackChans[int(msg.id)] <- msg
 		case Close:
 			fallthrough
@@ -86,9 +80,7 @@ func (m *Multiplexer) StartRead() error {
 
 func (m *Multiplexer) StartWrite() error {
 	for msg := range m.writeChan {
-		fmt.Printf("To be writen: %s\n", msg.data)
 		encoded := msg.encode()
-		fmt.Printf("Raw: %v\n", encoded)
 		m.w.Write(encoded)
 	}
 	return nil
@@ -152,14 +144,8 @@ type Writer struct {
 }
 
 func (w *Writer) Write(buf []byte) (n int, err error) {
-	println("send payload")
 	w.writeChan <- NewMessage(Frame, w.id, buf)
-	// if err := <-w.errChan; err != nil {
-	// 	return -1, err
-	// }
-	println("wait for ack")
 	msg := <-w.ackChan
-	println("return write")
 	return msg.n, msg.err
 }
 
@@ -172,13 +158,10 @@ type Reader struct {
 func (r *Reader) Read(buf []byte) (int, error) {
 
 	// Wait for a message
-	println("------> read chan")
 	msg := <-r.readChan
-	println("++ send ack")
 	copy(buf, msg.data)
 
 	// Send ACK
 	r.writeChan <- NewMessage(Ack, r.id, nil)
-	println("return read")
 	return msg.n, msg.err
 }

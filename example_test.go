@@ -18,12 +18,10 @@ func ExampleSimple() {
 			log.Fatal(err)
 		}
 		wr := m.NewWriter(0)
-		n, err := fmt.Fprintf(wr, "Hello World!!!\n")
-		fmt.Printf("----> wr n: %d, err: %v\n", n, err)
+		fmt.Fprintf(wr, "Hello World!!!")
 
 		wr2 := m.NewWriter(1)
-		n, err = fmt.Fprintf(wr2, "Hello the World!!!\n")
-		fmt.Printf("----> wr2 n: %d, err: %v\n", n, err)
+		fmt.Fprintf(wr2, "Hello the World!!!")
 	}()
 	m, _ := multio.NewMultiplexer(r2, w)
 
@@ -38,13 +36,17 @@ func ExampleSimple() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("-----> %s\n", buf[:n])
+	fmt.Printf("%s\n", buf[:n])
 
 	rd2 := m.NewReader(1)
 	n, err = rd2.Read(buf)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("- rd2 ----> %s\n", buf[:n])
+	fmt.Printf("%s\n", buf[:n])
 	<-ch
+
+	// output:
+	// Hello World!!!
+	// Hello the World!!!
 }
