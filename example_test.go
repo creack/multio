@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-func ExampleSimple() {
+func ExampleMultiplexer() {
 	r, w := io.Pipe()
 	r2, w2 := io.Pipe()
 	ch := make(chan struct{})
