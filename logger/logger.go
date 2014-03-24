@@ -24,11 +24,13 @@ const (
 var (
 	sections = map[string]*int{}
 	std      = New(os.Stderr, "default", 0)
+	quiet    *bool
 )
 
 func init() {
 	// Tell the flag package we are using -v but discard the value. We'll manually parse later.
 	sections["default"] = flag.Int("v", defaultLevel, "verbose level")
+	quiet = flag.Bool("q", false, "quiet mode: display only errors")
 }
 
 type Logger struct {
@@ -68,8 +70,19 @@ func New(out io.Writer, section string, level ...int) *Logger {
 }
 
 func (l *Logger) Output(level int, s string) error {
-	sectionLevel := sections[l.section]
-	if *sectionLevel >= level {
+	var (
+		sectionLevel = sections[l.section]
+		lvl          = defaultLevel
+	)
+	if flag.Parsed() {
+		if *quiet && level > 0 {
+			return nil
+		}
+		lvl = *sectionLevel
+	} else if l.section != "default" {
+		lvl = defaultSectionLevel
+	}
+	if lvl >= level {
 		l.Lock()
 		_, err := l.out.Write([]byte(s))
 		l.Unlock()
