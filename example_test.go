@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-func ExampleMultiplexer_SimplePipe() {
+func ExampleMultiplexer_simplePipe() {
 	// Create two pipe pair to have both way read/write
 	// We could use socketpair, socket or other, but let's
 	// stick with pipes for now
@@ -63,7 +63,7 @@ func ExampleMultiplexer_SimplePipe() {
 	// Hello the World!!!
 }
 
-func ExampleMultiplexer_ReadWriter() {
+func ExampleMultiplexer_readWriter() {
 	// Create two pipe pair to have both way read/write
 	// We could use socketpair, socket or other, but let's
 	// stick with pipes for now

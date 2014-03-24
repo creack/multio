@@ -8,8 +8,10 @@ import (
 )
 
 const (
+	// PageSize is the default buffer size from io.Copy
 	PageSize = 32 * 1024
 
+	// MPVersion is the current version of the multiplexer
 	MPVersion = 1
 )
 
@@ -29,6 +31,9 @@ type chanMap struct {
 	msgs map[int]chan *Message
 }
 
+// Get abstracts map access and is thread safe.
+// If the map is not initialized, create it.
+// If the requested key does not exists, create it.
 func (cm *chanMap) Get(key int) chan *Message {
 	cm.RLock()
 	defer cm.RUnlock()
@@ -42,6 +47,7 @@ func (cm *chanMap) Get(key int) chan *Message {
 	return cm.msgs[key]
 }
 
+// Delete is the thread safe version of delete
 func (cm *chanMap) Delete(key int) {
 	cm.Lock()
 	defer cm.Unlock()
@@ -51,6 +57,8 @@ func (cm *chanMap) Delete(key int) {
 	}
 }
 
+// SetChanIfNotExist makes sure the map is initialized
+// and create the requested key if it does not already exists.
 func (cm *chanMap) SetChanIfNotExist(key int) {
 	cm.Lock()
 	defer cm.Unlock()
@@ -58,13 +66,14 @@ func (cm *chanMap) SetChanIfNotExist(key int) {
 	if cm.msgs == nil {
 		cm.msgs = make(map[int]chan *Message)
 	}
-	if _, exists := cm.msgs[key]; exists {
-		return
-	} else {
+	if _, exists := cm.msgs[key]; !exists {
 		cm.msgs[key] = make(chan *Message)
 	}
 }
 
+// Multiplexe allow to read/write N streams on top of
+// one read/write pair. It can be pipes, socketpair, socket,
+// file, or anything that can read and write.
 type Multiplexer struct {
 	r         io.Reader
 	w         io.Writer
@@ -106,6 +115,9 @@ func (m *Multiplexer) closeChan(id int) {
 	}
 }
 
+// StartRead starts the read goroutine.
+// Each multiplexer has only one Read syscall and then dispatch
+// the incomming message to the proper place.
 func (m *Multiplexer) StartRead() error {
 	defer log.Debug("StartRead finished")
 	buf := make([]byte, PageSize+HeaderLen)
@@ -138,6 +150,10 @@ func (m *Multiplexer) StartRead() error {
 	return nil
 }
 
+// StartWrite starts the write goroutine.
+// Each multiplexer has only one Write syscall.
+// It pulls messages from the chan and sends them
+// as it receives them.
 func (m *Multiplexer) StartWrite() error {
 	defer log.Debug("---> StartWrite finished")
 	for msg := range m.writeChan {
@@ -150,6 +166,17 @@ func (m *Multiplexer) StartWrite() error {
 	return nil
 }
 
+// NewMultiplexer instanciate a new Multiplexer.
+// It take one or N argument, the idea is to have at least
+// one reader and one writer.
+// You can pass separatly a reader, a writer and a closer.
+// Note that only the first of each will be used except for closer:
+// each closer passed will be called upon Close().
+// If the parameter is already both (file, socket), you can specify
+// only one.
+// If you want to use pipes, as they are only one-way, you can
+// send two of them, the read side from one, the write side from the other.
+// NewMultiplexer starts the read and write goroutines.
 func NewMultiplexer(rwc ...interface{}) (*Multiplexer, error) {
 	m := &Multiplexer{
 		c: []io.Closer{},
@@ -180,6 +207,8 @@ func NewMultiplexer(rwc ...interface{}) (*Multiplexer, error) {
 	return m, nil
 }
 
+// NewWriter instanciate a new writer from the multiplexer.
+// It takes an id which will be used to match the other side.
 func (m *Multiplexer) NewWriter(id int) *WriteCloser {
 	m.ackChans.SetChanIfNotExist(id)
 
@@ -190,6 +219,8 @@ func (m *Multiplexer) NewWriter(id int) *WriteCloser {
 	}
 }
 
+// NewReader instanciate a new reader from the multiplexer.
+// It takes an id which will be used to match the other side.
 func (m *Multiplexer) NewReader(id int) *ReadCloser {
 	m.readChans.SetChanIfNotExist(id)
 
@@ -200,6 +231,8 @@ func (m *Multiplexer) NewReader(id int) *ReadCloser {
 	}
 }
 
+// NewReadWriter instanciate a new readWriter from the multiplexer.
+// It takes an id which will be used to match the other side.
 func (m *Multiplexer) NewReadWriter(id int) *ReadWriteCloser {
 	return &ReadWriteCloser{
 		ReadCloser:  m.NewReader(id),
@@ -207,6 +240,9 @@ func (m *Multiplexer) NewReadWriter(id int) *ReadWriteCloser {
 	}
 }
 
+// Close terminate the multiplexer instance.
+// It closes all the chan, flag the object as closed,
+// close the underlying read/write if they are closers.
 func (m *Multiplexer) Close() error {
 	m.closed = true
 	for id := range m.readChans.msgs {

@@ -7,11 +7,12 @@ import (
 )
 
 var (
-	ErrClosedIO = errors.New("Error: this I/O has been closed")
+	// ErrClosedIO is caused by using the writer while closed.
+	ErrClosedIO = errors.New("this I/O has been closed")
 )
 
-type WriteBroeadcaster MultiWriter
-
+// MultiWriter is a io.Writer that writes to N underlying writers.
+// New underlying writers can be add via MultiWriter.Add()
 type MultiWriter struct {
 	sync.RWMutex
 	outputs []io.WriteCloser
@@ -40,6 +41,7 @@ func (mw *MultiWriter) init() error {
 	return nil
 }
 
+// Write send buf to all underlying writers.
 func (mw *MultiWriter) Write(buf []byte) (int, error) {
 	if err := mw.init(); err != nil {
 		return -1, err
@@ -67,6 +69,8 @@ func (mw *MultiWriter) Write(buf []byte) (int, error) {
 	return len(buf), err
 }
 
+// Add adds a new writer in the MultiWriter.
+// Any Write after this will send data to the Added writer.
 func (mw *MultiWriter) Add(out io.WriteCloser) error {
 	if err := mw.init(); err != nil {
 		return err
@@ -78,6 +82,7 @@ func (mw *MultiWriter) Add(out io.WriteCloser) error {
 	return nil
 }
 
+// Close terminate the writer and close all underlying writers.
 func (mw *MultiWriter) Close() error {
 	mw.Lock()
 	defer mw.Unlock()
