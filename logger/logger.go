@@ -84,6 +84,9 @@ func (l *Logger) Output(level int, s string) error {
 	}
 	if lvl >= level {
 		l.Lock()
+		if s[len(s)-1] != '\n' {
+			s += "\n"
+		}
 		_, err := l.out.Write([]byte(s))
 		l.Unlock()
 		return err
