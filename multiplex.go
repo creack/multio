@@ -42,6 +42,15 @@ func (cm *chanMap) Get(key int) chan *Message {
 	return cm.msgs[key]
 }
 
+func (cm *chanMap) Delete(key int) {
+	cm.Lock()
+	defer cm.Unlock()
+
+	if _, exists := cm.msgs[key]; exists {
+		delete(cm.msgs, key)
+	}
+}
+
 func (cm *chanMap) SetChanIfNotExist(key int) {
 	cm.Lock()
 	defer cm.Unlock()
@@ -59,10 +68,11 @@ func (cm *chanMap) SetChanIfNotExist(key int) {
 type Multiplexer struct {
 	r         io.Reader
 	w         io.Writer
-	c         io.Closer // TODO: implement Close()
+	c         []io.Closer // TODO: implement Close()
 	writeChan chan *Message
 	readChans chanMap
 	ackChans  chanMap
+	closed    bool
 }
 
 // decode cannot fail. In case of error, it populate the err field from Message.
@@ -85,12 +95,29 @@ func (m *Multiplexer) encodeMsg(src []byte) []byte {
 	return msg.encode()
 }
 
+func (m *Multiplexer) closeChan(id int) {
+	if c := m.ackChans.Get(id); c != nil {
+		close(c)
+		m.ackChans.Delete(id)
+	}
+	if c := m.readChans.Get(id); c != nil {
+		close(c)
+		m.readChans.Delete(id)
+	}
+}
+
 func (m *Multiplexer) StartRead() error {
+	defer log.Debug("StartRead finished")
 	buf := make([]byte, PageSize+HeaderLen)
-	for {
+	for !m.closed {
 		n, err := m.r.Read(buf)
+		log.Lprintf(5, "read: %v, closed: %v\n", err, m.closed)
 		msg, err := m.decodeMsg(buf[:n], err)
 		if err != nil {
+			if err == io.EOF {
+				m.Close()
+				continue
+			}
 			// An error will cause deadlock panic if not properly handled
 			log.Error(err)
 			continue
@@ -111,18 +138,8 @@ func (m *Multiplexer) StartRead() error {
 	return nil
 }
 
-func (m *Multiplexer) closeChan(id int) {
-	// if c, exists := m.ackChans[id]; exists {
-	// 	close(c)
-	// 	delete(m.ackChans, id)
-	// }
-	// if c, exists := m.readChans[id]; exists {
-	// 	close(c)
-	// 	delete(m.readChans, id)
-	// }
-}
-
 func (m *Multiplexer) StartWrite() error {
+	defer log.Debug("---> StartWrite finished")
 	for msg := range m.writeChan {
 		encoded := msg.encode()
 		m.w.Write(encoded)
@@ -134,7 +151,9 @@ func (m *Multiplexer) StartWrite() error {
 }
 
 func NewMultiplexer(rwc ...interface{}) (*Multiplexer, error) {
-	m := &Multiplexer{}
+	m := &Multiplexer{
+		c: []io.Closer{},
+	}
 	for _, rwc := range rwc {
 		if r, ok := rwc.(io.Reader); ok && m.r == nil {
 			m.r = r
@@ -142,8 +161,11 @@ func NewMultiplexer(rwc ...interface{}) (*Multiplexer, error) {
 		if w, ok := rwc.(io.Writer); ok && m.w == nil {
 			m.w = w
 		}
-		if c, ok := rwc.(io.Closer); ok && m.c == nil {
-			m.c = c
+		if c, ok := rwc.(io.Closer); ok {
+			log.Debug("Adding a closer")
+			m.c = append(m.c, c)
+		} else {
+			log.Debug("Adding a non-closer")
 		}
 	}
 	if m.r == nil || m.w == nil {
@@ -176,6 +198,26 @@ func (m *Multiplexer) NewReader(id int) io.ReadCloser {
 		writeChan: m.writeChan,
 		readChan:  m.readChans.Get(id),
 	}
+}
+
+func (m *Multiplexer) Close() error {
+	m.closed = true
+	for id := range m.readChans.msgs {
+		m.closeChan(id)
+	}
+	for id := range m.ackChans.msgs {
+		m.closeChan(id)
+	}
+	log.Debugf("Closing writeChan\n")
+	if m.writeChan != nil {
+		close(m.writeChan)
+		m.writeChan = nil
+	}
+	log.Debugf("Closing %d i/o\n", len(m.c))
+	for _, c := range m.c {
+		c.Close()
+	}
+	return nil
 }
 
 type Writer struct {
