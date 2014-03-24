@@ -180,23 +180,30 @@ func NewMultiplexer(rwc ...interface{}) (*Multiplexer, error) {
 	return m, nil
 }
 
-func (m *Multiplexer) NewWriter(id int) io.WriteCloser {
+func (m *Multiplexer) NewWriter(id int) *WriteCloser {
 	m.ackChans.SetChanIfNotExist(id)
 
-	return &Writer{
+	return &WriteCloser{
 		id:        id,
 		writeChan: m.writeChan,
 		ackChan:   m.ackChans.Get(id),
 	}
 }
 
-func (m *Multiplexer) NewReader(id int) io.ReadCloser {
+func (m *Multiplexer) NewReader(id int) *ReadCloser {
 	m.readChans.SetChanIfNotExist(id)
 
-	return &Reader{
+	return &ReadCloser{
 		id:        id,
 		writeChan: m.writeChan,
 		readChan:  m.readChans.Get(id),
+	}
+}
+
+func (m *Multiplexer) NewReadWriter(id int) *ReadWriteCloser {
+	return &ReadWriteCloser{
+		ReadCloser:  m.NewReader(id),
+		WriteCloser: m.NewWriter(id),
 	}
 }
 
@@ -220,32 +227,35 @@ func (m *Multiplexer) Close() error {
 	return nil
 }
 
-type Writer struct {
+type WriteCloser struct {
 	id        int
 	writeChan chan *Message
 	ackChan   chan *Message
 }
 
-func (w *Writer) Write(buf []byte) (n int, err error) {
+func (w *WriteCloser) Write(buf []byte) (n int, err error) {
 	// Send the buffer to the other side
 	w.writeChan <- NewMessage(Frame, w.id, buf)
 	// Wait for ACK
 	msg := <-w.ackChan
+	if msg == nil {
+		return 0, io.EOF
+	}
 	return msg.n, msg.err
 }
 
-func (w *Writer) Close() error {
+func (w *WriteCloser) Close() error {
 	w.writeChan <- NewMessage(Close, w.id, nil)
 	return nil
 }
 
-type Reader struct {
+type ReadCloser struct {
 	id        int
 	readChan  chan *Message
 	writeChan chan *Message
 }
 
-func (r *Reader) Read(buf []byte) (int, error) {
+func (r *ReadCloser) Read(buf []byte) (int, error) {
 	// Wait for a message
 	msg := <-r.readChan
 	if msg == nil {
@@ -258,7 +268,21 @@ func (r *Reader) Read(buf []byte) (int, error) {
 	return msg.n, msg.err
 }
 
-func (r *Reader) Close() error {
+func (r *ReadCloser) Close() error {
 	r.writeChan <- NewMessage(Close, r.id, nil)
 	return nil
+}
+
+type ReadWriteCloser struct {
+	*ReadCloser
+	*WriteCloser
+}
+
+func (rw *ReadWriteCloser) Close() error {
+	e1 := rw.ReadCloser.Close()
+	e2 := rw.WriteCloser.Close()
+	if e1 != nil {
+		return e1
+	}
+	return e2
 }
