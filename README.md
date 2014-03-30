@@ -5,11 +5,12 @@ Multio
 [![Build Status](https://travis-ci.org/creack/multio.png)](https://travis-ci.org/creack/multio)
 [![Coverage Status](https://coveralls.io/repos/creack/multio/badge.png?branch=master)](https://coveralls.io/r/creack/multio?branch=master)
 
+[![status](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/status.png)](https://sourcegraph.com/github.com/creack/multio)
+[![docs examples](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/docs-examples.png)](https://sourcegraph.com/github.com/creack/multio)
 [![xrefs](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/xrefs.png)](https://sourcegraph.com/github.com/creack/multio)
 [![funcs](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/funcs.png)](https://sourcegraph.com/github.com/creack/multio)
 [![top func](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/top-func.png)](https://sourcegraph.com/github.com/creack/multio)
 [![library users](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/library-users.png)](https://sourcegraph.com/github.com/creack/multio)
-[![status](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/status.png)](https://sourcegraph.com/github.com/creack/multio)
 
 Multiple I/O operation for Golang
 =================================
