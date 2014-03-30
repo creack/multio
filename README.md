@@ -1,12 +1,9 @@
-multio
+Multio
 ======
-
-Multiple I/O operation for Golang
 
 [![GoDoc](https://godoc.org/github.com/creack/multio?status.png)](https://godoc.org/github.com/creack/multio)
 [![Build Status](https://travis-ci.org/creack/multio.png)](https://travis-ci.org/creack/multio)
 [![Coverage Status](https://coveralls.io/repos/creack/multio/badge.png?branch=master)](https://coveralls.io/r/creack/multio?branch=master)
-
 
 [![xrefs](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/xrefs.png)](https://sourcegraph.com/github.com/creack/multio)
 [![funcs](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/funcs.png)](https://sourcegraph.com/github.com/creack/multio)
@@ -14,7 +11,8 @@ Multiple I/O operation for Golang
 [![library users](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/library-users.png)](https://sourcegraph.com/github.com/creack/multio)
 [![status](https://sourcegraph.com/api/repos/github.com/creack/multio/badges/status.png)](https://sourcegraph.com/github.com/creack/multio)
 
-===========
+Multiple I/O operation for Golang
+=================================
 
 Multio is a simple multiplexing / MultiRead / MultiWriter libarary.
 
